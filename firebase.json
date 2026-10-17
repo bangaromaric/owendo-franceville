@@ -1,0 +1,25 @@
+{
+  "hosting": {
+    "site": "owendo-franceville",
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      ".firebaserc",
+      "README.md",
+      "PROMPT.md",
+      "LICENSE",
+      "**/.*",
+      "**/.*/**",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          { "key": "Cache-Control", "value": "public, max-age=300" }
+        ]
+      }
+    ],
+    "cleanUrls": true
+  }
+}

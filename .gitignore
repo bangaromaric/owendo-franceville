@@ -1,0 +1,31 @@
+# IDE
+.idea/
+.vscode/
+
+# Firebase
+.firebase/
+.firebaserc
+.runtimeconfig.json
+
+# Node
+node_modules/
+
+# Logs
+*.log
+
+# Variables d'environnement
+.env
+.env.*
+!.env.example
+
+# Fichiers temporaires d'editeur
+*~
+*.swp
+
+# Brouillon de message de commit
+commit-msg.txt
+
+# Systeme
+.DS_Store
+Thumbs.db
+desktop.ini

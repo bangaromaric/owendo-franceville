@@ -1,0 +1,2094 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Owendo → Franceville</title>
+    <style>
+        :root {
+            --bg-panel: rgba(15, 22, 18, 0.84);
+            --bg-panel-solid: #111915;
+            --border: rgba(255, 255, 255, 0.16);
+            --accent: #f3c623;
+            --accent-green: #1f8a4c;
+            --text: #f4f6f5;
+            --text-muted: #b0bcb5;
+            --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body, html {
+            width: 100%; height: 100%; overflow: hidden;
+            background-color: #0b110e; font-family: var(--font); color: var(--text);
+        }
+        #canvas-container { position: fixed; inset: 0; z-index: 1; }
+        button, .btn {
+            user-select: none; -webkit-user-select: none;
+            cursor: pointer; font-family: inherit;
+        }
+        /* Écran de chargement */
+        #loader {
+            position: fixed; inset: 0; z-index: 100;
+            background: radial-gradient(circle at center, #16261d 0%, #09100c 100%);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 24px; text-align: center; transition: opacity 0.5s ease;
+        }
+        #loader.hidden { opacity: 0; pointer-events: none; }
+        .loader-box {
+            max-width: 440px; width: 100%; background: var(--bg-panel);
+            border: 1px solid var(--border); border-radius: 12px; padding: 28px 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+        }
+        .loader-title { font-size: 1.35rem; font-weight: 700; color: var(--accent); margin-bottom: 6px; }
+        .loader-sub { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 20px; }
+        .progress-track {
+            width: 100%; height: 10px; background: rgba(255,255,255,0.1);
+            border-radius: 99px; overflow: hidden; margin-bottom: 12px;
+        }
+        .progress-fill {
+            height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent-green), var(--accent));
+            transition: width 0.2s ease;
+        }
+        .loader-step { font-size: 0.85rem; color: var(--text); font-weight: 500; }
+
+        /* En-tête */
+        #header {
+            position: fixed; top: 14px; left: 14px; z-index: 10;
+            background: var(--bg-panel); backdrop-filter: blur(8px);
+            border: 1px solid var(--border); border-radius: 10px;
+            padding: 10px 14px; max-width: calc(100vw - 150px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+        }
+        #header h1 { font-size: 1.05rem; font-weight: 700; letter-spacing: 0.2px; color: #fff; }
+        #header .sub { font-size: 0.82rem; color: var(--accent); font-weight: 600; margin-top: 2px; }
+        #header .meta { font-size: 0.75rem; color: var(--text-muted); margin-top: 3px; }
+
+        /* Compteur FPS & Infos haut-droite */
+        #top-right {
+            position: fixed; top: 14px; right: 14px; z-index: 10;
+            display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+        }
+        .pill {
+            background: var(--bg-panel); backdrop-filter: blur(8px);
+            border: 1px solid var(--border); border-radius: 8px;
+            padding: 6px 11px; font-size: 0.8rem; font-weight: 600;
+            display: flex; align-items: center; gap: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .fps-val { font-variant-numeric: tabular-nums; color: var(--accent); }
+
+        /* Bandeau PK et Biome */
+        #telemetry {
+            position: fixed; top: 108px; left: 14px; z-index: 10;
+            background: var(--bg-panel); backdrop-filter: blur(8px);
+            border: 1px solid var(--border); border-left: 4px solid var(--accent);
+            border-radius: 8px; padding: 8px 14px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+        }
+        #pk-display { font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; }
+        #biome-display { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+
+        /* Barre de contrôles bas-gauche */
+        #controls {
+            position: fixed; bottom: 14px; left: 14px; z-index: 10;
+            display: flex; flex-wrap: wrap; gap: 6px;
+            max-width: calc(100vw - 210px);
+            background: var(--bg-panel); backdrop-filter: blur(8px);
+            border: 1px solid var(--border); border-radius: 10px; padding: 8px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+        }
+        .ctrl-btn {
+            background: rgba(255,255,255,0.08); color: var(--text);
+            border: 1px solid rgba(255,255,255,0.14); border-radius: 6px;
+            padding: 7px 11px; font-size: 0.8rem; font-weight: 600;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+        }
+        .ctrl-btn:hover { background: rgba(255,255,255,0.16); }
+        .ctrl-btn.active {
+            background: var(--accent); color: #111; border-color: var(--accent);
+        }
+        .ctrl-btn.toggle-on {
+            background: var(--accent-green); color: #fff; border-color: #2fb868;
+        }
+
+        /* Mini-carte */
+        #minimap-wrap {
+            position: fixed; bottom: 14px; right: 14px; z-index: 10;
+            width: 176px; height: 140px;
+            background: var(--bg-panel); backdrop-filter: blur(8px);
+            border: 1px solid var(--border); border-radius: 10px;
+            padding: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+            display: flex; flex-direction: column;
+        }
+        #minimap-title {
+            font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase;
+            letter-spacing: 0.5px; margin-bottom: 2px; display: flex; justify-content: space-between;
+        }
+        #minimap { width: 100%; height: 100%; border-radius: 6px; display: block; }
+
+        /* Fiche de gare (Modal surimpression) */
+        #station-card {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            z-index: 25; width: min(440px, calc(100vw - 28px));
+            background: var(--bg-panel-solid); border: 1px solid var(--border);
+            border-top: 4px solid var(--accent); border-radius: 12px;
+            padding: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.75);
+            display: none;
+        }
+        #station-card.secondary { border-top-color: #63b3ed; }
+        #station-card.visible { display: block; animation: popIn 0.25s ease-out; }
+        @keyframes popIn {
+            from { opacity: 0; transform: translate(-50%, -46%); }
+            to { opacity: 1; transform: translate(-50%, -50%); }
+        }
+        .st-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+        .st-name { font-size: 1.35rem; font-weight: 700; color: #fff; }
+        .st-badge {
+            font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+            padding: 4px 8px; border-radius: 99px; letter-spacing: 0.4px; white-space: nowrap;
+        }
+        .st-badge.principale { background: rgba(243, 198, 35, 0.2); color: var(--accent); border: 1px solid rgba(243, 198, 35, 0.4); }
+        .st-badge.secondaire { background: rgba(99, 179, 237, 0.2); color: #90cdf4; border: 1px solid rgba(99, 179, 237, 0.4); }
+        .st-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+            background: rgba(255,255,255,0.04); padding: 10px; border-radius: 8px; margin-bottom: 12px;
+        }
+        .st-cell-label { font-size: 0.7rem; color: var(--text-muted); }
+        .st-cell-val { font-size: 0.92rem; font-weight: 700; color: #fff; margin-top: 2px; }
+        .uncertain {
+            color: var(--accent); cursor: help; border-bottom: 1px dotted var(--accent);
+            margin-left: 2px; font-weight: 700;
+        }
+        .st-fact { font-size: 0.88rem; line-height: 1.45; color: #dce3df; margin-bottom: 16px; }
+        .st-footer { display: flex; justify-content: space-between; align-items: center; }
+        .st-timer { font-size: 0.8rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+        .btn-primary {
+            background: var(--accent); color: #111; border: none; border-radius: 6px;
+            padding: 8px 16px; font-size: 0.85rem; font-weight: 700;
+        }
+        .btn-primary:hover { filter: brightness(1.08); }
+
+        /* Écran de fin */
+        #end-modal {
+            position: fixed; inset: 0; z-index: 30;
+            background: rgba(8, 12, 10, 0.82); backdrop-filter: blur(6px);
+            display: none; align-items: center; justify-content: center; padding: 20px;
+        }
+        #end-modal.visible { display: flex; }
+        .end-box {
+            max-width: 440px; width: 100%; background: var(--bg-panel-solid);
+            border: 1px solid var(--border); border-top: 4px solid var(--accent-green);
+            border-radius: 12px; padding: 24px; text-align: center;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.8);
+        }
+        .end-title { font-size: 1.4rem; font-weight: 700; color: #fff; margin-bottom: 6px; }
+        .end-sub { font-size: 0.88rem; color: var(--text-muted); margin-bottom: 18px; }
+        .end-stats {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+            background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; margin-bottom: 20px;
+        }
+        .end-actions { display: flex; gap: 10px; justify-content: center; }
+
+        /* Mode cinéma (Touche C) */
+        body.cinema-mode .ui-hideable {
+            opacity: 0 !important; pointer-events: none !important;
+        }
+
+        @media (max-width: 640px) {
+            #telemetry { top: auto; bottom: 162px; left: 14px; }
+            #controls { max-width: calc(100vw - 28px); bottom: 14px; }
+            #minimap-wrap { bottom: 162px; right: 14px; width: 145px; height: 115px; }
+        }
+    </style>
+    <script type="importmap">
+        {
+          "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+          }
+        }
+    </script>
+</head>
+<body>
+
+<div id="canvas-container"></div>
+
+<!-- Écran de chargement -->
+<div id="loader" role="status" aria-live="polite">
+    <div class="loader-box">
+        <div class="loader-title">Owendo → Franceville</div>
+        <div class="loader-sub">648 km à travers le Gabon</div>
+        <div class="progress-track">
+            <div class="progress-fill" id="loader-bar"></div>
+        </div>
+        <div class="loader-step" id="loader-step">Initialisation…</div>
+    </div>
+</div>
+
+<!-- Titre permanent (visible même en mode cinéma) -->
+<header id="header">
+    <h1>Owendo → Franceville</h1>
+    <div class="sub">648 km à travers le Gabon</div>
+    <div class="meta">Sélection de 8 gares sur les 24 que compte la ligne</div>
+</header>
+
+<!-- Compteur FPS & indication Cinéma -->
+<div id="top-right" class="ui-hideable">
+    <div class="pill" aria-label="Images par seconde">
+        <span>FPS</span>
+        <span class="fps-val" id="fps-counter">60</span>
+    </div>
+    <button class="ctrl-btn" id="btn-cinema" aria-label="Basculer le mode cinéma (touche C)" title="Touche C">
+        Cinéma (C)
+    </button>
+</div>
+
+<!-- Bandeau PK & Paysage -->
+<div id="telemetry" class="ui-hideable" aria-live="off">
+    <div id="pk-display">PK 0 / 648</div>
+    <div id="biome-display">Forêt équatoriale dense</div>
+</div>
+
+<!-- Contrôles -->
+<nav id="controls" class="ui-hideable" aria-label="Contrôles du train et de la scène">
+    <button class="ctrl-btn" id="btn-pause" aria-label="Mettre en pause ou reprendre">Pause</button>
+    <button class="ctrl-btn" id="btn-prev" aria-label="Retourner à la gare précédente">⏮ Gare préc.</button>
+    <button class="ctrl-btn active" id="btn-spd-1" aria-label="Vitesse normale x1">x1</button>
+    <button class="ctrl-btn" id="btn-spd-2" aria-label="Vitesse rapide x2">x2</button>
+    <button class="ctrl-btn" id="btn-spd-4" aria-label="Vitesse très rapide x4">x4</button>
+    <button class="ctrl-btn" id="btn-cam" aria-label="Basculer entre la caméra cabine et la caméra drone">Caméra : Cabine</button>
+    <button class="ctrl-btn toggle-on" id="btn-pop" aria-label="Afficher ou masquer la couche habitants et villages">
+        Habitants : ON (<span id="pop-count">0</span>)
+    </button>
+</nav>
+
+<!-- Mini-carte -->
+<div id="minimap-wrap" class="ui-hideable" aria-label="Mini-carte du tracé">
+    <div id="minimap-title">
+        <span>Owendo</span>
+        <span>Franceville</span>
+    </div>
+    <canvas id="minimap" width="164" height="114"></canvas>
+</div>
+
+<!-- Fiche de gare -->
+<section id="station-card" class="ui-hideable" role="dialog" aria-labelledby="st-title">
+    <div class="st-header">
+        <h2 class="st-name" id="st-title">Owendo-Virié</h2>
+        <span class="st-badge principale" id="st-type">Gare principale</span>
+    </div>
+    <div class="st-grid">
+        <div>
+            <div class="st-cell-label">Point kilométrique</div>
+            <div class="st-cell-val" id="st-pk">PK 0</div>
+        </div>
+        <div>
+            <div class="st-cell-label">Province</div>
+            <div class="st-cell-val" id="st-prov">Estuaire</div>
+        </div>
+        <div>
+            <div class="st-cell-label">Population</div>
+            <div class="st-cell-val" id="st-pop">80 000</div>
+        </div>
+    </div>
+    <p class="st-fact" id="st-fact"></p>
+    <div class="st-footer">
+        <span class="st-timer" id="st-timer">Départ dans 8 s</span>
+        <button class="btn-primary" id="btn-depart" aria-label="Repartir immédiatement de la gare">Repartir</button>
+    </div>
+</section>
+
+<!-- Écran de fin de voyage -->
+<section id="end-modal" role="dialog" aria-labelledby="end-heading">
+    <div class="end-box">
+        <h2 class="end-title" id="end-heading">Terminus : Franceville</h2>
+        <div class="end-sub">Ligne Owendo - Franceville, 648 km</div>
+        <div class="end-stats">
+            <div>
+                <div class="st-cell-label">Distance totale</div>
+                <div class="st-cell-val" id="end-dist">648 km</div>
+            </div>
+            <div>
+                <div class="st-cell-label">Gares desservies</div>
+                <div class="st-cell-val" id="end-stops">7 / 7</div>
+            </div>
+            <div>
+                <div class="st-cell-label">Durée réelle</div>
+                <div class="st-cell-val" id="end-time">03:00</div>
+            </div>
+        </div>
+        <div class="end-actions">
+            <button class="btn-primary" id="btn-restart" aria-label="Refaire le voyage depuis Owendo-Virié">Refaire le voyage</button>
+            <button class="ctrl-btn" id="btn-freeview" aria-label="Explorer la scène en vue libre">Vue libre</button>
+        </div>
+    </div>
+</section>
+
+<script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ============================================================================
+    // 1. DONNÉES DE RÉFÉRENCE (STRICTEMENT INCHANGÉES)
+    // ============================================================================
+    const TOTAL_KM = 648;
+    const STATIONS = [
+        { nom: "Owendo-Virié", pk: 0,  pkSur: true, type: "principale", province: "Estuaire",   pop: 80000, popSure: false,
+            fait: "Gare de Libreville et PK 0 de la ligne. Siège de l'exploitant ferroviaire et atelier principal, à côté des ports minéralier et grumier d'où partent le manganèse et le bois." },
+        { nom: "Ntoum",    pk: 35, pkSur: false, type: "secondaire", province: "Estuaire",   pop: 30000, popSure: false,
+            fait: "Gare secondaire desservie par le Train Omnibus l'Équateur. Pôle de cimenteries et de carrières, à la transition entre la région de Libreville et la grande forêt." },
+        { nom: "Ndjolé",    pk: 182, pkSur: false, type: "principale", province: "Moyen-Ogooué", pop: 10000, popSure: false,
+            fait: "Poste fondé par Savorgnan de Brazza en 1883 au pied des premiers rapides de l'Ogooué. Samory Touré, almami du Wassoulou, y est mort en exil en 1900." },
+        { nom: "Lopé",     pk: 290, pkSur: false, type: "principale", province: "Ogooué-Ivindo", pop: 2000,  popSure: false,
+            fait: "Porte du Parc national de la Lopé, inscrit au patrimoine mondial de l'UNESCO. Mosaïque unique de forêt et de savane, mandrills et gravures rupestres." },
+        { nom: "Booué",    pk: 338, pkSur: false, type: "principale", province: "Ogooué-Ivindo", pop: 6000,  popSure: false,
+            fait: "Carrefour forestier dans une boucle de l'Ogooué, en amont des chutes. Atelier de maintenance ferroviaire." },
+        { nom: "Lastourville", pk: 484, pkSur: false, type: "principale", province: "Ogooué-Lolo",  pop: 11000, popSure: false,
+            fait: "Sur les rives de l'Ogooué, connue des spéléologues pour sa quarantaine de grottes dolomitiques ornées de vestiges préhistoriques. La gare s'écrit Lastourville, la commune s'écrit souvent Lastoursville." },
+        { nom: "Moanda",    pk: 619, pkSur: true, type: "principale", province: "Haut-Ogooué",  pop: 45000, popSure: false,
+            fait: "Capitale du manganèse, exploité par la Comilog. Le minerai parcourt les 619 km jusqu'à Owendo : c'est la raison d'être économique de la ligne." },
+        { nom: "Franceville", pk: 648, pkSur: true, type: "principale", province: "Haut-Ogooué",  pop: 110000, popSure: false,
+            fait: "Terminus oriental, atteint en décembre 1986. Ville des plateaux batéké, siège de l'université USTM et du centre de recherche CIRMF." }
+    ];
+
+    // Quatre traversées majeures (dont l'Ogooué)
+    const RIVERS = [
+        { nom: "Rivière Como", pk: 85 },
+        { nom: "Fleuve Ogooué (Ndjolé)", pk: 186 },
+        { nom: "Fleuve Ogooué (Booué)", pk: 334 },
+        { nom: "Fleuve Ogooué (Lastourville)", pk: 480 }
+    ];
+
+    // ============================================================================
+    // 2. CONFIGURATION GLOBALE & ÉTAT DU VOYAGE
+    // ============================================================================
+    const WORLD_LENGTH = 2600; // Longueur 3D correspondant aux 648 km
+    const EXTRA_TRACK = 85;    // Prolongement au-delà de Franceville (~quelques centaines de mètres à l'échelle)
+    const CURVE_MAX_KM = TOTAL_KM * (1 + EXTRA_TRACK / WORLD_LENGTH);
+    const CURVE_CTRL_COUNT = 50;
+    // Prolongement en amont du PK 0 : les voitures du train s'y placent à l'arrêt d'Owendo,
+    // au lieu d'être toutes ramenées au PK 0 et de s'interpénétrer.
+    const CURVE_MIN_KM = -CURVE_MAX_KM / CURVE_CTRL_COUNT;
+    const CURVE_SPAN_KM = CURVE_MAX_KM - CURVE_MIN_KM;
+    const TRACK_Z_SPAN = WORLD_LENGTH + EXTRA_TRACK;              // z du PK 0 au PK CURVE_MAX_KM
+    const CURVE_Z_START = -(CURVE_MIN_KM / CURVE_MAX_KM) * TRACK_Z_SPAN; // z positif du début de courbe
+
+    // Décélération à l'approche des quais : la phase de ralentissement allonge le trajet,
+    // la vitesse de croisière la compense pour tenir les 3 minutes annoncées.
+    const APPROACH_KM = 9;       // longueur de la phase de décélération
+    const APPROACH_FLOOR = 0.3;  // vitesse plancher devant le quai
+    const BASE_DURATION_SEC = 180; // 3 minutes de roulage à vitesse x1
+    // Surcoût de chaque approche, exprimé en kilomètres équivalents à vitesse de croisière.
+    // v(x) = V * max(f, x/A) donne un temps de (A/V)(ln(1/f) + 1) au lieu de A/V.
+    const APPROACH_OVERHEAD_KM = APPROACH_KM * Math.log(1 / APPROACH_FLOOR);
+    const APPROACH_COUNT = STATIONS.length - 1;
+    const BASE_SPEED_KMS = (TOTAL_KM + APPROACH_COUNT * APPROACH_OVERHEAD_KM) / BASE_DURATION_SEC;
+
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const state = {
+        currentPK: 0,           // Source unique de vérité pour la distance (0 à 648)
+        speedMultiplier: 1,
+        paused: false,
+        cameraMode: 'cabine',   // 'cabine' | 'drone'
+        stationState: 'cruising', // 'cruising' | 'stopped' | 'finished'
+        activeStationIdx: 0,
+        nextStationIdx: 0,
+        stopCountdown: 0,
+        elapsedTravelSec: 0,
+        servedPrincipalesCount: 0,
+        inhabitantsVisible: true
+    };
+
+    // ============================================================================
+    // 3. INITIALISATION THREE.JS, LUMIÈRES ET DÔME CÉLESTE
+    // ============================================================================
+    const container = document.getElementById('canvas-container');
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    // Exposition relevée : ACES écrase les tons moyens, et la scène doit rester
+    // lisible sur un écran de téléphone en extérieur.
+    renderer.toneMappingExposure = 1.16;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0xd99b66, 0.0028);
+
+    const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.2, 650);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enabled = false;
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.minDistance = 4;
+    controls.maxDistance = 120; // >= 80 requis pour le plan large
+    controls.maxPolarAngle = Math.PI * 0.48;
+
+    // Dôme céleste en Shader (fin d'après-midi équatoriale : horizon ambré chaud vers zénith indigo/bleu profond)
+    const skyGeo = new THREE.SphereGeometry(550, 24, 16);
+    const skyMat = new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        depthWrite: false,
+        uniforms: {
+            topColor: { value: new THREE.Color(0x1f3b5c) },
+            midColor: { value: new THREE.Color(0xc86d51) },
+            bottomColor: { value: new THREE.Color(0xf4b46c) }
+        },
+        vertexShader: `
+        varying vec3 vWorldPosition;
+        void main() {
+          vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+          vWorldPosition = worldPosition.xyz;
+          gl_Position = projectionMatrix * viewMatrix * vec4( cameraPosition + position, 1.0 );
+        }
+      `,
+        fragmentShader: `
+        uniform vec3 topColor;
+        uniform vec3 midColor;
+        uniform vec3 bottomColor;
+        varying vec3 vWorldPosition;
+        void main() {
+          float h = normalize(vWorldPosition - cameraPosition).y;
+          vec3 col = mix(bottomColor, midColor, smoothstep(0.0, 0.22, max(h, 0.0)));
+          col = mix(col, topColor, smoothstep(0.18, 0.75, max(h, 0.0)));
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `
+    });
+    const skyMesh = new THREE.Mesh(skyGeo, skyMat);
+    scene.add(skyMesh);
+
+    // Couleur de sol très assombrie auparavant : les faces opposées au soleil tombaient
+    // dans un brun presque noir. Le rebond du sol est remonté, l'ambiance reste chaude.
+    const hemiLight = new THREE.HemisphereLight(0xffe0bb, 0x556341, 0.88);
+    scene.add(hemiLight);
+
+    // Appoint froid et diffus, pour décoller les volumes à contre-jour sans ternir le coucher de soleil
+    const fillLight = new THREE.DirectionalLight(0x9ec4e8, 0.32);
+    fillLight.position.set(-60, 35, -40);
+    scene.add(fillLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffc08a, 2.05);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.set(1024, 1024);
+    dirLight.shadow.camera.near = 5;
+    dirLight.shadow.camera.far = 180;
+    const dCam = 48;
+    dirLight.shadow.camera.left = -dCam;
+    dirLight.shadow.camera.right = dCam;
+    dirLight.shadow.camera.top = dCam;
+    dirLight.shadow.camera.bottom = -dCam;
+    dirLight.shadow.bias = -0.0008;
+    scene.add(dirLight);
+    scene.add(dirLight.target); // Impératif : la cible est dans la scène pour que les ombres suivent le train
+
+    // ============================================================================
+    // 4. COURBE DE LA VOIE ET FONCTIONS MATHÉMATIQUES DU TERRAIN
+    // ============================================================================
+    let trackCurve = null;
+    let trackSamples = [];
+    const SAMPLE_COUNT = 1350;
+
+    function buildTrackCurve() {
+        const pts = [];
+        // i démarre à -1 : un pas de point de contrôle en amont du PK 0, pour que le train
+        // au complet tienne sur la voie à l'arrêt d'Owendo. Les points i >= 0 sont inchangés.
+        for (let i = -1; i <= CURVE_CTRL_COUNT; i++) {
+            const pk = (i / CURVE_CTRL_COUNT) * CURVE_MAX_KM;
+            const uShape = pk / CURVE_MAX_KM;
+            const z = -uShape * TRACK_Z_SPAN;
+            // Sinusoïdes combinées reproduisant les méandres de la vallée de l'Ogooué
+            const x = Math.sin(uShape * Math.PI * 5.5) * 95 + Math.cos(uShape * Math.PI * 13) * 32 - 95 * (1 - uShape);
+            const y = getTrackElevationAtPK(pk);
+            pts.push(new THREE.Vector3(x, y, z));
+        }
+        trackCurve = new THREE.CatmullRomCurve3(pts);
+
+        // Échantillonnage rapide indexé par Z pour le nivellement du terrain
+        trackSamples = new Array(SAMPLE_COUNT + 1);
+        for (let i = 0; i <= SAMPLE_COUNT; i++) {
+            const u = i / SAMPLE_COUNT;
+            const p = trackCurve.getPointAt(u);
+            const tan = trackCurve.getTangentAt(u);
+            trackSamples[i] = { x: p.x, y: p.y, z: p.z, pk: CURVE_MIN_KM + u * CURVE_SPAN_KM, tan };
+        }
+    }
+
+    function getTrackElevationAtPK(pk) {
+        // Élévation progressive depuis l'Estuaire (PK 0) jusqu'aux plateaux du Haut-Ogooué (PK 648)
+        const base = 3.5 + (pk / TOTAL_KM) * 24.0;
+        const undul = Math.sin(pk * 0.035) * 2.4 + Math.cos(pk * 0.09) * 1.1;
+        return base + undul;
+    }
+
+    // Retourne la position sur la courbe à partir d'un PK exact.
+    // Source canonique inchangée : la position dérive du seul PK, y compris en amont du PK 0.
+    function getCurveUFromPK(pk) {
+        const clamped = Math.min(Math.max(pk, CURVE_MIN_KM), CURVE_MAX_KM);
+        return (clamped - CURVE_MIN_KM) / CURVE_SPAN_KM;
+    }
+
+    function getClosestTrackSampleByZ(z) {
+        const approxU = Math.min(Math.max((CURVE_Z_START - z) / (CURVE_Z_START + TRACK_Z_SPAN), 0), 1);
+        const idx = Math.round(approxU * SAMPLE_COUNT);
+        let best = trackSamples[idx];
+        let bestDistSq = 1e9;
+        const start = Math.max(0, idx - 18);
+        const end = Math.min(SAMPLE_COUNT, idx + 18);
+        for (let i = start; i <= end; i++) {
+            const s = trackSamples[i];
+            const dz = s.z - z;
+            if (dz * dz < bestDistSq) {
+                bestDistSq = dz * dz;
+                best = s;
+            }
+        }
+        return best;
+    }
+
+    function getBiomeName(pk) {
+        if (pk < 235) return "Forêt équatoriale dense";
+        if (pk < 375) return "Mosaïque forêt-savane (Lopé – Booué)";
+        if (pk < 545) return "Forêt de vallées (Ogooué-Lolo)";
+        return "Plateaux ouverts et terres latéritiques";
+    }
+
+    function getVegetationDensity(pk) {
+        if (pk < 235) return 1.0;
+        if (pk < 375) return 0.36;
+        if (pk < 545) return 0.78;
+        return 0.22;
+    }
+
+    // Calcul d'élévation du relief avec tranchées, remblais et lits de rivières
+    function evaluateTerrainHeight(x, z) {
+        const s = getClosestTrackSampleByZ(z);
+        const dx = x - s.x;
+        const dist = Math.abs(dx);
+        const pk = s.pk;
+
+        // Bruit procédural multi-fréquences pour collines et vallées
+        let rawH = s.y
+            + Math.sin(x * 0.032 + z * 0.021) * 9.5
+            + Math.cos(x * 0.075 - z * 0.048) * 4.2
+            + Math.sin(x * 0.16 + z * 0.14) * 1.4;
+
+        // Escarpements plus marqués vers Ndjolé - Lopé - Lastourville
+        if (pk > 150 && pk < 530) {
+            rawH += Math.sin(x * 0.05 - z * 0.03) * 5.5;
+        }
+
+        // Creusement des 4 traversées fluviales majeures sous les ponts
+        for (let r = 0; r < RIVERS.length; r++) {
+            const dpk = Math.abs(pk - RIVERS[r].pk);
+            if (dpk < 5.2) {
+                const riverFactor = Math.cos((dpk / 5.2) * Math.PI * 0.5);
+                const riverBed = s.y - 7.2;
+                rawH = THREE.MathUtils.lerp(rawH, riverBed, riverFactor * 0.92);
+            }
+        }
+
+        // Couloir nivelé sous la voie (remblais et tranchées)
+        // Mais pas au-dessus d'un fleuve (où le pont prend le relais)
+        let inRiver = false;
+        for (let r = 0; r < RIVERS.length; r++) {
+            if (Math.abs(pk - RIVERS[r].pk) < 3.6) { inRiver = true; break; }
+        }
+
+        if (!inRiver) {
+            if (dist < 2.6) {
+                return s.y - 0.15;
+            } else if (dist < 11.5) {
+                const blend = (dist - 2.6) / (11.5 - 2.6);
+                const smooth = blend * blend * (3 - 2 * blend);
+                return THREE.MathUtils.lerp(s.y - 0.15, rawH, smooth);
+            }
+        }
+        return rawH;
+    }
+
+    // ============================================================================
+    // 5. ÉTAPES DE GÉNÉRATION ASYNCHRONE
+    // ============================================================================
+    function buildTerrainStep() {
+        const segZ = 560;
+        const segX = 76;
+        const width = 340;
+        // +120 au lieu de +60 : le terrain couvre aussi le prolongement en amont du PK 0,
+        // où stationnent les voitures du train à l'arrêt d'Owendo.
+        const totalZ = WORLD_LENGTH + EXTRA_TRACK + 120;
+
+        const geo = new THREE.PlaneGeometry(width, totalZ, segX, segZ);
+        geo.rotateX(-Math.PI / 2);
+
+        const pos = geo.attributes.position;
+        const colors = new Float32Array(pos.count * 3);
+
+        // Teintes relevées : les valeurs d'origine tombaient dans le noir une fois
+        // éclairées de biais, surtout à contre-jour.
+        const cForest = new THREE.Color(0x356b33);
+        const cSavanna = new THREE.Color(0x9aa84a);
+        const cValley = new THREE.Color(0x3d7438);
+        const cLaterite = new THREE.Color(0xa84224);
+        const cPlateauGrass = new THREE.Color(0x9b8742);
+        const cBallast = new THREE.Color(0x5c493e);
+        const cCutSlope = new THREE.Color(0x8f4326);
+        const tmpCol = new THREE.Color();
+
+        for (let i = 0; i < pos.count; i++) {
+            const localX = pos.getX(i);
+            const z = pos.getZ(i) - totalZ / 2 + 80;
+            const s = getClosestTrackSampleByZ(z);
+            const worldX = s.x + localX;
+            const y = evaluateTerrainHeight(worldX, z);
+
+            pos.setXYZ(i, worldX, y, z);
+
+            const pk = s.pk;
+            const dist = Math.abs(localX);
+
+            // Coloration évolutive par biome
+            if (pk < 235) {
+                tmpCol.copy(cForest);
+            } else if (pk < 375) {
+                const f = (pk - 235) / 140;
+                const savannaMix = Math.sin(f * Math.PI) * 0.78;
+                tmpCol.copy(cForest).lerp(cSavanna, savannaMix);
+            } else if (pk < 545) {
+                tmpCol.copy(cValley);
+            } else {
+                const f = Math.min((pk - 545) / 65, 1);
+                const pat = (Math.sin(worldX * 0.09 + z * 0.09) + 1) * 0.5;
+                tmpCol.copy(cLaterite).lerp(cPlateauGrass, pat * 0.55);
+                tmpCol.lerp(cValley, 1 - f);
+            }
+
+            // Talus de tranchées en latérite et ballast sous la voie
+            if (dist < 2.5 && y >= s.y - 0.5) {
+                tmpCol.copy(cBallast);
+            } else if (dist < 7.5 && Math.abs(y - s.y) > 1.2) {
+                tmpCol.lerp(cCutSlope, 0.65);
+            }
+
+            const noise = (Math.sin(worldX * 0.37 + z * 0.29) * 0.04);
+            colors[i * 3]     = Math.min(Math.max(tmpCol.r + noise, 0), 1);
+            colors[i * 3 + 1] = Math.min(Math.max(tmpCol.g + noise, 0), 1);
+            colors[i * 3 + 2] = Math.min(Math.max(tmpCol.b + noise, 0), 1);
+        }
+
+        geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        geo.computeVertexNormals();
+
+        const mat = new THREE.MeshStandardMaterial({
+            vertexColors: true,
+            roughness: 0.92,
+            metalness: 0.05
+        });
+        const terrainMesh = new THREE.Mesh(geo, mat);
+        terrainMesh.receiveShadow = true;
+        scene.add(terrainMesh);
+    }
+
+    function buildTrackAndBridgesStep() {
+        // Traverses en InstancedMesh
+        const sleeperCount = 1900;
+        const sleeperGeo = new THREE.BoxGeometry(2.2, 0.14, 0.32);
+        const sleeperMat = new THREE.MeshStandardMaterial({ color: 0x3b2d23, roughness: 0.9 });
+        const sleepers = new THREE.InstancedMesh(sleeperGeo, sleeperMat, sleeperCount);
+        sleepers.receiveShadow = true;
+
+        // Rails gauche et droit en InstancedMesh
+        const railSegLen = (WORLD_LENGTH + EXTRA_TRACK) / sleeperCount * 1.05;
+        const railGeo = new THREE.BoxGeometry(0.09, 0.14, railSegLen);
+        const railMat = new THREE.MeshStandardMaterial({ color: 0x9aa0a6, metalness: 0.75, roughness: 0.35 });
+        const leftRails = new THREE.InstancedMesh(railGeo, railMat, sleeperCount);
+        const rightRails = new THREE.InstancedMesh(railGeo, railMat, sleeperCount);
+
+        const dummy = new THREE.Object3D();
+        const up = new THREE.Vector3(0, 1, 0);
+        const right = new THREE.Vector3();
+
+        for (let i = 0; i < sleeperCount; i++) {
+            const u = i / (sleeperCount - 1);
+            const pt = trackCurve.getPointAt(u);
+            const tan = trackCurve.getTangentAt(u);
+
+            dummy.position.copy(pt);
+            dummy.position.y += 0.02;
+            dummy.lookAt(pt.clone().add(tan));
+            dummy.updateMatrix();
+            sleepers.setMatrixAt(i, dummy.matrix);
+
+            right.crossVectors(tan, up).normalize();
+
+            dummy.position.copy(pt).addScaledVector(right, -0.68);
+            dummy.position.y += 0.12;
+            dummy.updateMatrix();
+            leftRails.setMatrixAt(i, dummy.matrix);
+
+            dummy.position.copy(pt).addScaledVector(right, 0.68);
+            dummy.position.y += 0.12;
+            dummy.updateMatrix();
+            rightRails.setMatrixAt(i, dummy.matrix);
+        }
+
+        scene.add(sleepers, leftRails, rightRails);
+
+        // Quatre traversées fluviales majeures et ponts à tablier métallique
+        const waterMat = new THREE.MeshStandardMaterial({
+            color: 0x2b5c4f, roughness: 0.2, metalness: 0.3, transparent: true, opacity: 0.88
+        });
+        const steelMat = new THREE.MeshStandardMaterial({
+            color: 0x46535e, roughness: 0.5, metalness: 0.65
+        });
+
+        RIVERS.forEach(river => {
+            const u = getCurveUFromPK(river.pk);
+            const center = trackCurve.getPointAt(u);
+            const tan = trackCurve.getTangentAt(u);
+
+            const group = new THREE.Group();
+            group.position.copy(center);
+            group.lookAt(center.clone().add(tan));
+
+            // Lit d'eau sous le pont
+            const waterGeo = new THREE.PlaneGeometry(240, 26);
+            waterGeo.rotateX(-Math.PI / 2);
+            const water = new THREE.Mesh(waterGeo, waterMat);
+            water.position.y = -5.4;
+            group.add(water);
+
+            // Tablier métallique et treillis latéraux
+            const deck = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.45, 28), steelMat);
+            deck.position.y = -0.25;
+            deck.castShadow = true;
+            deck.receiveShadow = true;
+            group.add(deck);
+
+            for (let side of [-1.75, 1.75]) {
+                const topBeam = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.25, 26), steelMat);
+                topBeam.position.set(side, 3.2, 0);
+                group.add(topBeam);
+
+                for (let z = -12; z <= 12; z += 4) {
+                    const strut = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3.5, 0.2), steelMat);
+                    strut.position.set(side, 1.5, z);
+                    strut.castShadow = true;
+                    group.add(strut);
+                }
+            }
+
+            // Piles en béton
+            for (let z of [-8, 8]) {
+                const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.85, 8, 8), steelMat);
+                pillar.position.set(0, -4.2, z);
+                group.add(pillar);
+            }
+
+            scene.add(group);
+        });
+    }
+
+    function buildForestStep() {
+        // 1. Fromagers à contreforts et houppier tabulaire.
+        // Le houppier est bâti en trois strates qui se chevauchent et dans lesquelles le tronc
+        // pénètre : un cylindre plat isolé se lisait de loin comme un disque flottant.
+        const MAX_KAPOK = 2200;
+        const trunkGeo = new THREE.CylinderGeometry(0.34, 1.05, 8.1, 5); // 5 pans simulant les contreforts
+        trunkGeo.translate(0, 4.05, 0);
+
+        const crownLowGeo = new THREE.CylinderGeometry(3.5, 2.3, 1.5, 7);
+        crownLowGeo.translate(0, 7.0, 0);                 // 6.25 à 7.75, le tronc monte à 8.1
+        const crownMidGeo = new THREE.CylinderGeometry(2.8, 3.4, 1.4, 7);
+        crownMidGeo.translate(0, 8.15, 0);                // 7.45 à 8.85
+        const crownTopGeo = new THREE.CylinderGeometry(1.25, 2.6, 1.2, 7);
+        crownTopGeo.translate(0, 9.1, 0);                 // 8.5 à 9.7
+
+        const barkMat = new THREE.MeshStandardMaterial({ color: 0x6b5a45, roughness: 0.95 });
+        const canopyMat = new THREE.MeshStandardMaterial({ color: 0x2f7a35, roughness: 0.85 });
+
+        const kapokTrunks = new THREE.InstancedMesh(trunkGeo, barkMat, MAX_KAPOK);
+        const kapokCrowns = new THREE.InstancedMesh(crownLowGeo, canopyMat, MAX_KAPOK);
+        const kapokCrownsMid = new THREE.InstancedMesh(crownMidGeo, canopyMat, MAX_KAPOK);
+        const kapokCrownsTop = new THREE.InstancedMesh(crownTopGeo, canopyMat, MAX_KAPOK);
+        // Seule la strate la plus large porte l'ombre : le tronc et les deux autres strates
+        // n'ajouteraient presque rien à la silhouette projetée, pour deux fois le coût.
+        kapokCrownsMid.castShadow = true;
+
+        // 2. Palmiers
+        const MAX_PALM = 2000;
+        const palmStemGeo = new THREE.CylinderGeometry(0.14, 0.22, 4.8, 5);
+        palmStemGeo.translate(0, 2.4, 0);
+        // Cône inversé : pointe vers le bas, base large au sommet. Un cône classique
+        // donnait une silhouette de conifère, hors sujet sous l'équateur.
+        const palmCrownGeo = new THREE.ConeGeometry(2.45, 1.3, 7);
+        palmCrownGeo.rotateX(Math.PI);
+        palmCrownGeo.translate(0, 4.75, 0); // pointe à 4.1, sous le haut du stipe (4.8)
+        const palmMat = new THREE.MeshStandardMaterial({ color: 0x43913a, roughness: 0.8 });
+
+        const palmStems = new THREE.InstancedMesh(palmStemGeo, barkMat, MAX_PALM);
+        const palmCrowns = new THREE.InstancedMesh(palmCrownGeo, palmMat, MAX_PALM);
+        palmCrowns.castShadow = true;
+
+        // 3. Fougères de sous-bois
+        const MAX_FERN = 3000;
+        const fernGeo = new THREE.ConeGeometry(0.85, 0.9, 5);
+        fernGeo.translate(0, 0.45, 0);
+        const fernMat = new THREE.MeshStandardMaterial({ color: 0x4f9a3c, roughness: 0.85 });
+        const ferns = new THREE.InstancedMesh(fernGeo, fernMat, MAX_FERN);
+
+        let kIdx = 0, pIdx = 0, fIdx = 0;
+        const dummy = new THREE.Object3D();
+        const col = new THREE.Color();
+
+        // Distribution pilotée par le biome, aucun arbre à moins de 3 unités de la voie
+        let seed = 42;
+        const rand = () => {
+            seed = (seed * 1664525 + 1013904223) % 4294967296;
+            return seed / 4294967296;
+        };
+
+        const totalZ = WORLD_LENGTH + EXTRA_TRACK;
+        // 11 000 tirages au lieu de 4 200 : sur la section Owendo - Ndjolé, où la densité
+        // vaut 1, l'horizon doit être fermé par la canopée et non ponctué d'arbres isolés.
+        for (let i = 0; i < 11000; i++) {
+            const u = rand();
+            const z = -u * totalZ;
+            const s = getClosestTrackSampleByZ(z);
+            const density = getVegetationDensity(s.pk);
+            if (rand() > density) continue;
+
+            // Distance latérale >= 4.2 unités (strictement > 3 unités).
+            // Exposant relevé : la végétation se resserre près de la voie, là où on la voit.
+            const side = rand() > 0.5 ? 1 : -1;
+            const offset = 4.2 + Math.pow(rand(), 1.9) * 85;
+            const x = s.x + side * offset;
+            const y = evaluateTerrainHeight(x, z);
+
+            // Pas d'arbre dans le lit des rivières
+            if (y < s.y - 2.5) continue;
+
+            const scale = 0.75 + rand() * 0.7;
+            dummy.position.set(x, y, z);
+            dummy.rotation.set(0, rand() * Math.PI * 2, 0);
+            dummy.scale.set(scale, scale, scale);
+            dummy.updateMatrix();
+
+            const rType = rand();
+            if (rType < 0.34 && kIdx < MAX_KAPOK) {
+                kapokTrunks.setMatrixAt(kIdx, dummy.matrix);
+                // Les trois strates partagent la matrice de l'arbre
+                kapokCrowns.setMatrixAt(kIdx, dummy.matrix);
+                kapokCrownsMid.setMatrixAt(kIdx, dummy.matrix);
+                kapokCrownsTop.setMatrixAt(kIdx, dummy.matrix);
+                // Luminosité remontée de 0.20-0.28 à 0.33-0.45, et strates du haut plus claires
+                col.setHSL(0.3 + (rand() - 0.5) * 0.06, 0.48, 0.33 + rand() * 0.12);
+                kapokCrowns.setColorAt(kIdx, col);
+                kapokCrownsMid.setColorAt(kIdx, col.clone().offsetHSL(0, 0, 0.04));
+                kapokCrownsTop.setColorAt(kIdx, col.clone().offsetHSL(0, 0, 0.08));
+                kIdx++;
+            } else if (rType < 0.65 && pIdx < MAX_PALM) {
+                palmStems.setMatrixAt(pIdx, dummy.matrix);
+                palmCrowns.setMatrixAt(pIdx, dummy.matrix);
+                pIdx++;
+            } else if (fIdx < MAX_FERN) {
+                ferns.setMatrixAt(fIdx, dummy.matrix);
+                fIdx++;
+            }
+        }
+
+        kapokTrunks.count = kIdx;
+        [kapokCrowns, kapokCrownsMid, kapokCrownsTop].forEach(inst => {
+            inst.count = kIdx;
+            if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+        });
+        palmStems.count = pIdx;
+        palmCrowns.count = pIdx;
+        ferns.count = fIdx;
+
+        scene.add(kapokTrunks, kapokCrowns, kapokCrownsMid, kapokCrownsTop, palmStems, palmCrowns, ferns);
+    }
+
+    // Panneau de gare généré en CanvasTexture
+    function createStationSignTexture(nom, type) {
+        const c = document.createElement('canvas');
+        c.width = 512;
+        c.height = 128;
+        const ctx = c.getContext('2d');
+
+        ctx.fillStyle = type === 'principale' ? '#103824' : '#1b354f';
+        ctx.fillRect(0, 0, 512, 128);
+
+        ctx.strokeStyle = type === 'principale' ? '#f3c623' : '#90cdf4';
+        ctx.lineWidth = 8;
+        ctx.strokeRect(8, 8, 496, 112);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 42px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(nom.toUpperCase(), 256, 54);
+
+        ctx.fillStyle = type === 'principale' ? '#f3c623' : '#90cdf4';
+        ctx.font = '600 20px sans-serif';
+        ctx.fillText(type === 'principale' ? 'GARE PRINCIPALE' : 'GARE SECONDAIRE', 256, 96);
+
+        const tex = new THREE.CanvasTexture(c);
+        tex.needsUpdate = true;
+        return tex;
+    }
+
+    const stationTransforms = [];
+
+    function buildStationsStep() {
+        const platformMat = new THREE.MeshStandardMaterial({ color: 0x878278, roughness: 0.9 });
+        const edgeMat = new THREE.MeshStandardMaterial({ color: 0xf3c623, roughness: 0.6 });
+        const postMat = new THREE.MeshStandardMaterial({ color: 0x2b2b2b, metalness: 0.6 });
+
+        STATIONS.forEach((st, idx) => {
+            const u = getCurveUFromPK(st.pk);
+            const pt = trackCurve.getPointAt(u);
+            const tan = trackCurve.getTangentAt(u);
+            const up = new THREE.Vector3(0, 1, 0);
+            const right = new THREE.Vector3().crossVectors(tan, up).normalize();
+
+            const stGroup = new THREE.Group();
+            stGroup.position.copy(pt);
+            stGroup.lookAt(pt.clone().add(tan));
+
+            // Quai à droite de la voie
+            const platGeo = new THREE.BoxGeometry(3.2, 0.65, 16);
+            const plat = new THREE.Mesh(platGeo, platformMat);
+            plat.position.set(3.2, 0.25, 0);
+            plat.receiveShadow = true;
+            plat.castShadow = true;
+            stGroup.add(plat);
+
+            // Bande de sécurité jaune en bord de quai
+            const edge = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.67, 16), edgeMat);
+            edge.position.set(1.7, 0.25, 0);
+            stGroup.add(edge);
+
+            // Abri de quai
+            const roofMat = new THREE.MeshStandardMaterial({
+                color: st.type === 'principale' ? 0x1f6e3f : 0x3b5978, roughness: 0.6
+            });
+            const canopy = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.14, 8), roofMat);
+            canopy.position.set(3.4, 2.6, 0);
+            canopy.castShadow = true;
+            stGroup.add(canopy);
+
+            for (let z of [-3.2, 3.2]) {
+                const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.2, 6), postMat);
+                pillar.position.set(3.4, 1.5, z);
+                stGroup.add(pillar);
+            }
+
+            // Panneau portant le nom de la gare en CanvasTexture
+            const signTex = createStationSignTexture(st.nom, st.type);
+            const signMat = new THREE.MeshBasicMaterial({ map: signTex });
+            const signBoard = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.75, 2.8), signMat);
+            signBoard.position.set(2.4, 2.1, 4.5);
+            stGroup.add(signBoard);
+
+            const signPost1 = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.8, 6), postMat);
+            signPost1.position.set(2.4, 1.2, 3.5);
+            const signPost2 = signPost1.clone();
+            signPost2.position.set(2.4, 1.2, 5.5);
+            stGroup.add(signPost1, signPost2);
+
+            scene.add(stGroup);
+
+            stationTransforms.push({
+                idx,
+                station: st,
+                group: stGroup,
+                worldPos: pt.clone(),
+                tangent: tan.clone(),
+                right: right.clone()
+            });
+        });
+    }
+
+    // ============================================================================
+    // 6. TRAIN (LOCOMOTIVE JAUNE ET VERTE + 4 VOITURES VOYAGEURS) & OISEAUX
+    // ============================================================================
+    const trainParts = [];
+    let birdsSystem = null;
+
+    function createTrainVehicle(isLoco) {
+        const group = new THREE.Group();
+        const yellowMat = new THREE.MeshStandardMaterial({ color: 0xf3c623, roughness: 0.4, metalness: 0.2 });
+        const greenMat = new THREE.MeshStandardMaterial({ color: 0x166938, roughness: 0.45, metalness: 0.2 });
+        const darkMat = new THREE.MeshStandardMaterial({ color: 0x222629, roughness: 0.7 });
+        const glassMat = new THREE.MeshStandardMaterial({ color: 0x182c38, roughness: 0.15, metalness: 0.8 });
+
+        // Châssis, allongé à l'avant sur la locomotive pour porter le capot long
+        const chassisLen = isLoco ? 5.8 : 4.4;
+        const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.3, chassisLen), darkMat);
+        chassis.position.set(0, 0.35, isLoco ? 0.7 : 0);
+        group.add(chassis);
+
+        if (isLoco) {
+            // Caisse principale jaune et verte
+            const bodyBottom = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.65, 4.2), greenMat);
+            bodyBottom.position.y = 0.82;
+            bodyBottom.castShadow = true;
+            group.add(bodyBottom);
+
+            const bodyTop = new THREE.Mesh(new THREE.BoxGeometry(1.48, 0.65, 3.6), yellowMat);
+            bodyTop.position.set(0, 1.45, -0.2);
+            bodyTop.castShadow = true;
+            group.add(bodyTop);
+
+            // Capot avant long. À 0.65 de profondeur, sa face supérieure était vue en rasance
+            // depuis la cabine et s'étalait en aplat sur 22 % du bas de l'image. Porté à 1.6,
+            // il se lit en perspective fuyante et redonne l'ancrage « à bord ».
+            const nose = new THREE.Mesh(new THREE.BoxGeometry(1.42, 0.55, 1.6), yellowMat);
+            nose.position.set(0, 1.15, 2.35); // avant à z = 3.15
+            nose.castShadow = true;
+            group.add(nose);
+
+            // Pare-brise cabine
+            const windShield = new THREE.Mesh(new THREE.BoxGeometry(1.36, 0.38, 0.1), glassMat);
+            windShield.position.set(0, 1.52, 1.62);
+            group.add(windShield);
+
+            // Phares avant
+            const lightMat = new THREE.MeshBasicMaterial({ color: 0xfff6cc });
+            const hl1 = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.06, 8), lightMat);
+            hl1.rotation.x = Math.PI / 2;
+            hl1.position.set(-0.42, 1.05, 3.13); // reportés sur la nouvelle face avant
+            const hl2 = hl1.clone();
+            hl2.position.x = 0.42;
+            group.add(hl1, hl2);
+        } else {
+            // Voiture voyageurs (porte d'environ 1.15 unité de haut pour calibrer l'échelle des adultes)
+            const coachLow = new THREE.Mesh(new THREE.BoxGeometry(1.48, 0.6, 4.3), greenMat);
+            coachLow.position.y = 0.8;
+            coachLow.castShadow = true;
+            group.add(coachLow);
+
+            const coachHigh = new THREE.Mesh(new THREE.BoxGeometry(1.48, 0.62, 4.3), yellowMat);
+            coachHigh.position.y = 1.4;
+            coachHigh.castShadow = true;
+            group.add(coachHigh);
+
+            const roof = new THREE.Mesh(new THREE.BoxGeometry(1.42, 0.14, 4.25), darkMat);
+            roof.position.y = 1.78;
+            group.add(roof);
+
+            // Bandeau de fenêtres
+            const winStrip = new THREE.Mesh(new THREE.BoxGeometry(1.51, 0.3, 3.5), glassMat);
+            winStrip.position.y = 1.38;
+            group.add(winStrip);
+        }
+
+        scene.add(group);
+        return group;
+    }
+
+    function buildTrainAndBirds() {
+        for (let i = 0; i < 5; i++) {
+            trainParts.push(createTrainVehicle(i === 0));
+        }
+
+        // Faune : oiseaux posés au sol qui s'envolent au passage de la locomotive puis reviennent
+        const BIRD_COUNT = 55;
+        const birdGeo = new THREE.ConeGeometry(0.18, 0.45, 4);
+        birdGeo.rotateX(Math.PI / 2);
+        const birdMat = new THREE.MeshStandardMaterial({ color: 0xf4f6f8, roughness: 0.6 });
+        const birdMesh = new THREE.InstancedMesh(birdGeo, birdMat, BIRD_COUNT);
+
+        const birdData = [];
+        const dummy = new THREE.Object3D();
+        for (let i = 0; i < BIRD_COUNT; i++) {
+            const pk = 12 + (i / BIRD_COUNT) * (TOTAL_KM - 24);
+            const u = getCurveUFromPK(pk);
+            const pt = trackCurve.getPointAt(u);
+            const side = (i % 2 === 0 ? 1 : -1) * (2.5 + (i % 4) * 1.1);
+            const home = new THREE.Vector3(pt.x + side, pt.y + 0.12, pt.z);
+            birdData.push({
+                home,
+                pos: home.clone(),
+                flying: 0,
+                phase: i * 0.9
+            });
+            dummy.position.copy(home);
+            dummy.updateMatrix();
+            birdMesh.setMatrixAt(i, dummy.matrix);
+        }
+        scene.add(birdMesh);
+
+        birdsSystem = {
+            mesh: birdMesh,
+            data: birdData,
+            dummy: new THREE.Object3D(),
+            update(locoPos, time, dt) {
+                let dirty = false;
+                for (let i = 0; i < birdData.length; i++) {
+                    const b = birdData[i];
+                    const distSq = b.home.distanceToSquared(locoPos);
+                    if (distSq < 900) { // S'envolent à moins de 30 unités
+                        b.flying = Math.min(b.flying + dt * 1.4, 1);
+                    } else if (b.flying > 0) {
+                        b.flying = Math.max(b.flying - dt * 0.45, 0);
+                    }
+
+                    if (b.flying > 0) {
+                        const angle = time * 3.2 + b.phase;
+                        const radius = b.flying * 6.5;
+                        b.pos.x = b.home.x + Math.cos(angle) * radius;
+                        b.pos.z = b.home.z + Math.sin(angle) * radius;
+                        b.pos.y = b.home.y + b.flying * 8.5 + Math.sin(time * 8 + b.phase) * 0.4;
+                        this.dummy.position.copy(b.pos);
+                        this.dummy.rotation.set(0, -angle, Math.sin(time * 16 + b.phase) * 0.35);
+                        this.dummy.updateMatrix();
+                        this.mesh.setMatrixAt(i, this.dummy.matrix);
+                        dirty = true;
+                    }
+                }
+                if (dirty) this.mesh.instanceMatrix.needsUpdate = true;
+            }
+        };
+    }
+
+    // ============================================================================
+    // 7. SECTION ISOLÉE : HABITANTS ET VILLAGES (Point d'entrée unique : buildPopulation)
+    // ============================================================================
+    let populationSystem = null;
+
+    function createWaxTexture() {
+        const c = document.createElement('canvas');
+        c.width = 64; c.height = 64;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, 64, 64);
+        // Bandes et losanges géométriques façon pagne wax
+        ctx.fillStyle = '#d9d9d9';
+        ctx.fillRect(0, 10, 64, 8);
+        ctx.fillRect(0, 46, 64, 8);
+        ctx.strokeStyle = '#8c8c8c';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(32, 16); ctx.lineTo(52, 32); ctx.lineTo(32, 48); ctx.lineTo(12, 32); ctx.closePath();
+        ctx.stroke();
+        const tex = new THREE.CanvasTexture(c);
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+        return tex;
+    }
+
+    function buildPopulation(sceneRef, stationTransformsRef) {
+        const group = new THREE.Group();
+        sceneRef.add(group);
+
+        // Plafonds stricts : <= 400 personnages et <= 60 bâtiments
+        const MAX_PEOPLE = 360;
+        const MAX_BUILDINGS = 56;
+
+        // Échelle calibrée sur la porte d'une voiture voyageurs (~1.12 unité)
+        const skinGeo = new THREE.CylinderGeometry(0.11, 0.09, 0.32, 5);
+        skinGeo.translate(0, 0.96, 0);
+        const torsoGeo = new THREE.BoxGeometry(0.28, 0.44, 0.18);
+        torsoGeo.translate(0, 0.58, 0);
+        const legsGeo = new THREE.BoxGeometry(0.22, 0.36, 0.16);
+        legsGeo.translate(0, 0.18, 0);
+        const armGeo = new THREE.BoxGeometry(0.08, 0.36, 0.08);
+        armGeo.translate(0, -0.14, 0); // Pivot à l'épaule pour saluer
+
+        const waxTex = createWaxTexture();
+        const skinMat = new THREE.MeshStandardMaterial({ roughness: 0.8 });
+        const clothesMat = new THREE.MeshStandardMaterial({ map: waxTex, roughness: 0.75 });
+        const legsMat = new THREE.MeshStandardMaterial({ roughness: 0.85 });
+
+        // Pas d'ombre portée pour les personnages généraux
+        const skinInst = new THREE.InstancedMesh(skinGeo, skinMat, MAX_PEOPLE);
+        const torsoInst = new THREE.InstancedMesh(torsoGeo, clothesMat, MAX_PEOPLE);
+        const legsInst = new THREE.InstancedMesh(legsGeo, legsMat, MAX_PEOPLE);
+        const armInst = new THREE.InstancedMesh(armGeo, clothesMat, MAX_PEOPLE);
+        group.add(skinInst, torsoInst, legsInst, armInst);
+
+        // Ombre portée uniquement pour les personnages du quai de la gare courante (max 16)
+        const MAX_STATION_SHADOW = 16;
+        const shadowTorsoInst = new THREE.InstancedMesh(torsoGeo, clothesMat, MAX_STATION_SHADOW);
+        shadowTorsoInst.castShadow = true;
+        group.add(shadowTorsoInst);
+
+        // Accessoires : bagages, plateaux sur la tête, gilets de sécurité
+        const luggageInst = new THREE.InstancedMesh(
+            new THREE.BoxGeometry(0.32, 0.24, 0.22),
+            new THREE.MeshStandardMaterial({ color: 0x5c3a21, roughness: 0.8 }),
+            40
+        );
+        const trayInst = new THREE.InstancedMesh(
+            new THREE.CylinderGeometry(0.24, 0.2, 0.08, 6),
+            new THREE.MeshStandardMaterial({ color: 0xd9a05b, roughness: 0.7 }),
+            24
+        );
+        group.add(luggageInst, trayInst);
+
+        // Bâtiments (cases à toit de tôle ondulée ou végétal)
+        const wallGeo = new THREE.BoxGeometry(2.1, 1.35, 1.7);
+        wallGeo.translate(0, 0.675, 0);
+        const roofGeo = new THREE.ConeGeometry(1.75, 0.75, 4);
+        roofGeo.rotateY(Math.PI / 4);
+        roofGeo.translate(0, 1.65, 0);
+
+        const wallInst = new THREE.InstancedMesh(wallGeo, new THREE.MeshStandardMaterial({ roughness: 0.9 }), MAX_BUILDINGS);
+        const roofInst = new THREE.InstancedMesh(roofGeo, new THREE.MeshStandardMaterial({ roughness: 0.6, metalness: 0.25 }), MAX_BUILDINGS);
+        group.add(wallInst, roofInst);
+
+        // Détails de hameaux : sentiers de latérite, bananiers plantains, linge étendu, plans de fumée
+        const pathInst = new THREE.InstancedMesh(
+            new THREE.BoxGeometry(3.6, 0.05, 1.4),
+            new THREE.MeshStandardMaterial({ color: 0xa64424, roughness: 0.95 }),
+            30
+        );
+        const laundryInst = new THREE.InstancedMesh(
+            new THREE.BoxGeometry(1.4, 0.55, 0.04),
+            new THREE.MeshStandardMaterial({ color: 0xe63946, roughness: 0.7 }),
+            24
+        );
+        const smokeGeo = new THREE.PlaneGeometry(0.7, 1.3);
+        const smokeMat = new THREE.MeshBasicMaterial({
+            color: 0xdcdcdc, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false
+        });
+        const smokeInst = new THREE.InstancedMesh(smokeGeo, smokeMat, 36);
+        group.add(pathInst, laundryInst, smokeInst);
+
+        // Palettes réalistes
+        const skinTones = [0x3b2219, 0x4d2d20, 0x5e3827, 0x6e422e, 0x2e1a12];
+        const waxColors = [0xe63946, 0xf4a261, 0x2a9d8f, 0xe9c46a, 0x3a86ff, 0x8338ec, 0xfb5607, 0x06d6a0];
+        const trouserColors = [0x1d3557, 0x2b2d42, 0x4a4e69, 0x3d405b, 0x283618];
+
+        const people = [];
+        const smokes = [];
+        let pCount = 0, bCount = 0, lugCount = 0, trayCount = 0, pathCount = 0, launCount = 0, smkCount = 0;
+
+        const dummy = new THREE.Object3D();
+        const col = new THREE.Color();
+        // Transform de masquage réutilisable (hors champ, échelle quasi nulle)
+        const hiddenDummy = new THREE.Object3D();
+        hiddenDummy.position.set(0, -999, 0);
+        hiddenDummy.scale.set(0.001, 0.001, 0.001);
+
+        let seed = 1337;
+        const rand = () => {
+            seed = (seed * 1664525 + 1013904223) % 4294967296;
+            return seed / 4294967296;
+        };
+
+        function addPerson(pos, rotY, scale, role, stationIdx) {
+            if (pCount >= MAX_PEOPLE) return;
+            const idx = pCount++;
+            const skinHex = skinTones[Math.floor(rand() * skinTones.length)];
+            const clothHex = role === 'agent' ? 0xb5ff00 : waxColors[Math.floor(rand() * waxColors.length)];
+            const legHex = trouserColors[Math.floor(rand() * trouserColors.length)];
+
+            skinInst.setColorAt(idx, col.setHex(skinHex));
+            torsoInst.setColorAt(idx, col.setHex(clothHex));
+            armInst.setColorAt(idx, col.setHex(clothHex));
+            legsInst.setColorAt(idx, col.setHex(legHex));
+
+            const person = {
+                idx,
+                clothHex, // repris par le torse porteur d'ombre, qui sinon s'afficherait en blanc
+                basePos: pos.clone(),
+                pos: pos.clone(),
+                baseRotY: rotY,
+                scale,
+                role, // 'waiter' | 'seated' | 'vendor' | 'agent' | 'villager' | 'child_runner' | 'boarder'
+                stationIdx,
+                phase: rand() * Math.PI * 2,
+                boarded: false,
+                trayIdx: -1
+            };
+
+            if (role === 'seated' && lugCount < 40) {
+                dummy.position.set(pos.x, pos.y + 0.12, pos.z);
+                dummy.rotation.set(0, rotY, 0);
+                dummy.scale.set(1, 1, 1);
+                dummy.updateMatrix();
+                luggageInst.setMatrixAt(lugCount++, dummy.matrix);
+            } else if (role === 'vendor' && trayCount < 24) {
+                person.trayIdx = trayCount++;
+            }
+
+            people.push(person);
+            updatePersonMatrix(person, 0, false, false);
+        }
+
+        // shadowSlot >= 0 : le torse est rendu par shadowTorsoInst, qui porte l'ombre.
+        // L'instance correspondante de torsoInst est alors masquée, sans quoi deux torses
+        // se superposent, celui d'ombre n'ayant pas de couleur d'instance (donc blanc).
+        function updatePersonMatrix(p, time, lookAtTrain, waveArm, shadowSlot = -1) {
+            if (p.boarded) {
+                dummy.position.set(0, -999, 0);
+                dummy.scale.set(0.001, 0.001, 0.001);
+                dummy.updateMatrix();
+                skinInst.setMatrixAt(p.idx, dummy.matrix);
+                torsoInst.setMatrixAt(p.idx, dummy.matrix);
+                legsInst.setMatrixAt(p.idx, dummy.matrix);
+                armInst.setMatrixAt(p.idx, dummy.matrix);
+                p.torsoHidden = false;
+                return;
+            }
+
+            const rotY = lookAtTrain ? p.baseRotY - 0.5 : p.baseRotY;
+            const yOff = p.role === 'seated' ? -0.14 : 0;
+
+            dummy.position.set(p.pos.x, p.pos.y + yOff, p.pos.z);
+            dummy.rotation.set(0, rotY, 0);
+            dummy.scale.set(p.scale, p.scale, p.scale);
+            dummy.updateMatrix();
+
+            skinInst.setMatrixAt(p.idx, dummy.matrix);
+            legsInst.setMatrixAt(p.idx, dummy.matrix);
+
+            if (shadowSlot >= 0) {
+                shadowTorsoInst.setMatrixAt(shadowSlot, dummy.matrix);
+                shadowTorsoInst.setColorAt(shadowSlot, col.setHex(p.clothHex));
+                hiddenDummy.updateMatrix();
+                torsoInst.setMatrixAt(p.idx, hiddenDummy.matrix);
+                p.torsoHidden = true;
+            } else {
+                torsoInst.setMatrixAt(p.idx, dummy.matrix);
+                p.torsoHidden = false;
+            }
+
+            // Bras articulé
+            dummy.position.set(
+                p.pos.x + Math.cos(rotY) * 0.18 * p.scale,
+                p.pos.y + (0.76 + yOff) * p.scale,
+                p.pos.z - Math.sin(rotY) * 0.18 * p.scale
+            );
+            const armAngle = waveArm ? (Math.PI * 0.78 + Math.sin(time * 9 + p.phase) * 0.35) : 0.12;
+            dummy.rotation.set(armAngle, rotY, 0);
+            dummy.scale.set(p.scale, p.scale, p.scale);
+            dummy.updateMatrix();
+            armInst.setMatrixAt(p.idx, dummy.matrix);
+
+            if (p.trayIdx >= 0) {
+                dummy.position.set(p.pos.x, p.pos.y + 1.18 * p.scale, p.pos.z);
+                dummy.rotation.set(0, rotY, 0);
+                dummy.scale.set(1, 1, 1);
+                dummy.updateMatrix();
+                trayInst.setMatrixAt(p.trayIdx, dummy.matrix);
+            }
+        }
+
+        // 1. Sur les quais : 9 à 13 personnages par gare, en grappes et non en file.
+        // Le quai est bâti du côté -right de la voie (l'axe X local du groupe de gare vaut
+        // -right), et sa surface supérieure est à +0.575. Les personnages étaient posés en
+        // +right : ils se retrouvaient de l'autre côté de la voie, sur la terre battue.
+        const PLATFORM_SIDE = -1;      // côté du quai
+        const PLATFORM_TOP_Y = 0.575;  // hauteur de la surface du quai
+        stationTransformsRef.forEach((stTr, sIdx) => {
+            const count = 9 + (sIdx % 5); // Entre 9 et 13 (dans la fourchette 6 à 15)
+            // Trois grappes réparties le long du quai, chacune avec sa propre dispersion
+            const clusterZ = [-4.6 + rand() * 1.2, 0.4 + rand() * 1.4, 5.1 - rand() * 1.2];
+
+            for (let i = 0; i < count; i++) {
+                let role = 'waiter';
+                if (i === 0) role = 'agent';
+                else if (i === 1) role = 'vendor';
+                else if (i === 2 || i === 3) role = 'boarder';
+                else if (i === 4 || i === 5) role = 'seated';
+
+                // L'agent de sécurité reste près de la bande jaune, les autres en retrait
+                const lateral = role === 'agent' ? 2.0 : (2.4 + rand() * 1.9);
+                // Grappe de rattachement, avec dispersion dans les deux directions
+                const zc = clusterZ[i % clusterZ.length];
+                const alongTrack = zc + (rand() - 0.5) * 2.6;
+
+                const worldPos = stTr.worldPos.clone()
+                    .addScaledVector(stTr.right, PLATFORM_SIDE * lateral)
+                    .addScaledVector(stTr.tangent, alongTrack);
+                worldPos.y = stTr.worldPos.y + PLATFORM_TOP_Y;
+
+                const isChild = (i === count - 1);
+                const scale = isChild ? (0.64 + rand() * 0.08) : (0.9 + rand() * 0.18);
+                // Orientés vers la voie, donc vers +right depuis le quai
+                const rotY = Math.atan2(stTr.right.x, stTr.right.z) + (rand() - 0.5) * 0.8;
+
+                addPerson(worldPos, rotY, scale, role, sIdx);
+            }
+        });
+
+        // 2. Le long de la voie : hameaux plus fréquents à l'approche des gares
+        const hamletPKs = [18, 42, 168, 194, 278, 302, 328, 348, 472, 494, 608, 634];
+        hamletPKs.forEach((hpk, hIdx) => {
+            const u = getCurveUFromPK(hpk);
+            const pt = trackCurve.getPointAt(u);
+            const tan = trackCurve.getTangentAt(u);
+            const right = new THREE.Vector3().crossVectors(tan, new THREE.Vector3(0, 1, 0)).normalize();
+            const side = hIdx % 2 === 0 ? 1 : -1;
+
+            const numHouses = 3 + (hIdx % 3); // 3 à 5 cases par hameau (total <= 60)
+            const centerDist = 12 + rand() * 7;
+            const hamletCenter = pt.clone().addScaledVector(right, side * centerDist);
+            hamletCenter.y = evaluateTerrainHeight(hamletCenter.x, hamletCenter.z);
+
+            // Sentier de latérite
+            if (pathCount < 30) {
+                dummy.position.set(hamletCenter.x, hamletCenter.y + 0.04, hamletCenter.z);
+                dummy.rotation.set(0, rand() * Math.PI, 0);
+                dummy.scale.set(1.5, 1, 1.5);
+                dummy.updateMatrix();
+                pathInst.setMatrixAt(pathCount++, dummy.matrix);
+            }
+
+            // Linge étendu
+            if (launCount < 24) {
+                dummy.position.set(hamletCenter.x + 2, hamletCenter.y + 0.65, hamletCenter.z - 1.5);
+                dummy.rotation.set(0, rand() * Math.PI, 0);
+                dummy.scale.set(1, 1, 1);
+                dummy.updateMatrix();
+                laundryInst.setMatrixAt(launCount++, dummy.matrix);
+                laundryInst.setColorAt(launCount - 1, col.setHex(waxColors[launCount % waxColors.length]));
+            }
+
+            // Filet de fumée de cuisson (plans transparents croisés)
+            for (let s = 0; s < 2 && smkCount < 36; s++) {
+                const smkIdx = smkCount++;
+                smokes.push({
+                    idx: smkIdx,
+                    basePos: new THREE.Vector3(hamletCenter.x - 1.2, hamletCenter.y + 0.8, hamletCenter.z + 1.2),
+                    rotY: s * Math.PI * 0.5,
+                    phase: rand() * 6
+                });
+            }
+
+            // Cases du hameau
+            for (let h = 0; h < numHouses && bCount < MAX_BUILDINGS; h++) {
+                const bIdx = bCount++;
+                const angle = (h / numHouses) * Math.PI * 2 + rand() * 0.4;
+                const rad = 3.2 + rand() * 3.8;
+                const hx = hamletCenter.x + Math.cos(angle) * rad;
+                const hz = hamletCenter.z + Math.sin(angle) * rad;
+                const hy = evaluateTerrainHeight(hx, hz);
+
+                dummy.position.set(hx, hy, hz);
+                dummy.rotation.set(0, angle + Math.PI * 0.5, 0);
+                const sc = 0.85 + rand() * 0.3;
+                dummy.scale.set(sc, sc, sc);
+                dummy.updateMatrix();
+
+                wallInst.setMatrixAt(bIdx, dummy.matrix);
+                roofInst.setMatrixAt(bIdx, dummy.matrix);
+
+                wallInst.setColorAt(bIdx, col.setHex(h % 2 === 0 ? 0xc89d7c : 0xd9c2a3));
+                // Toit de tôle ondulée ou végétal
+                roofInst.setColorAt(bIdx, col.setHex(h % 3 === 0 ? 0x6b5b3e : 0x7a8288));
+            }
+
+            // Habitants du hameau + enfants qui courent le long de la voie
+            for (let v = 0; v < 5; v++) {
+                const isRunner = v < 2;
+                const distFromTrack = isRunner ? 4.4 : (centerDist - 2 + rand() * 4);
+                const pPos = pt.clone()
+                    .addScaledVector(right, side * distFromTrack)
+                    .addScaledVector(tan, (v - 2) * 2.2);
+                pPos.y = evaluateTerrainHeight(pPos.x, pPos.z);
+
+                const scale = isRunner ? (0.62 + rand() * 0.08) : (0.92 + rand() * 0.16);
+                const rotY = Math.atan2(-side * right.x, -side * right.z);
+                addPerson(pPos, rotY, scale, isRunner ? 'child_runner' : 'villager', -1);
+            }
+        });
+
+        skinInst.count = pCount;
+        torsoInst.count = pCount;
+        legsInst.count = pCount;
+        armInst.count = pCount;
+        luggageInst.count = lugCount;
+        trayInst.count = trayCount;
+        wallInst.count = bCount;
+        roofInst.count = bCount;
+        pathInst.count = pathCount;
+        laundryInst.count = launCount;
+        smokeInst.count = smkCount;
+
+        [skinInst, torsoInst, legsInst, armInst, wallInst, roofInst, laundryInst].forEach(inst => {
+            if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+        });
+
+        const totalObjects = pCount + bCount;
+
+        return {
+            totalObjects,
+            setVisible(v) {
+                group.visible = v;
+            },
+            resetBoarders() {
+                for (let i = 0; i < people.length; i++) {
+                    people[i].boarded = false;
+                    people[i].pos.copy(people[i].basePos);
+                }
+            },
+            triggerDepartureBoarding(stationIdx) {
+                for (let i = 0; i < people.length; i++) {
+                    if (people[i].stationIdx === stationIdx && people[i].role === 'boarder') {
+                        people[i].boarded = true;
+                    }
+                }
+            },
+            update(locoPos, time, currentStationIdx, isStoppingOrStopped) {
+                if (!group.visible) return;
+
+                let shadowIdx = 0;
+                let anyUpdated = false;
+
+                // N'anime que ce qui est à moins de 60 unités de la locomotive (60² = 3600)
+                for (let i = 0; i < people.length; i++) {
+                    const p = people[i];
+                    const dSq = p.basePos.distanceToSquared(locoPos);
+                    if (dSq > 3600) {
+                        // Hors de portée d'animation : on restaure quand même le torse
+                        // s'il avait été masqué au profit du torse porteur d'ombre.
+                        if (p.torsoHidden) {
+                            updatePersonMatrix(p, time, false, false, -1);
+                            anyUpdated = true;
+                        }
+                        continue;
+                    }
+
+                    anyUpdated = true;
+                    let wave = false;
+                    let look = false;
+
+                    let shadowSlot = -1;
+
+                    if (p.stationIdx >= 0) {
+                        look = true;
+                        wave = (p.idx % 2 === 0);
+                        // Ombre portée activée pour le quai de la gare courante
+                        if (p.stationIdx === currentStationIdx && !p.boarded && shadowIdx < MAX_STATION_SHADOW) {
+                            shadowSlot = shadowIdx++;
+                        }
+                    } else if (p.role === 'child_runner') {
+                        wave = true;
+                        look = true;
+                        // Court légèrement le long de la voie au passage du train
+                        p.pos.z = p.basePos.z - Math.sin(time * 3.5 + p.phase) * 1.4;
+                        p.pos.y = evaluateTerrainHeight(p.pos.x, p.pos.z) + Math.abs(Math.sin(time * 9 + p.phase)) * 0.08;
+                    } else {
+                        wave = (p.idx % 3 === 0);
+                    }
+
+                    updatePersonMatrix(p, time, look, wave, shadowSlot);
+                }
+
+                // Masquer les instances d'ombres inutilisées
+                hiddenDummy.updateMatrix();
+                for (let s = shadowIdx; s < MAX_STATION_SHADOW; s++) {
+                    shadowTorsoInst.setMatrixAt(s, hiddenDummy.matrix);
+                }
+                shadowTorsoInst.instanceMatrix.needsUpdate = true;
+                if (shadowTorsoInst.instanceColor) shadowTorsoInst.instanceColor.needsUpdate = true;
+
+                // Animation des filets de fumée à moins de 60 unités
+                for (let i = 0; i < smokes.length; i++) {
+                    const sm = smokes[i];
+                    if (sm.basePos.distanceToSquared(locoPos) > 3600) continue;
+                    const lift = ((time * 0.6 + sm.phase) % 1.8);
+                    dummy.position.set(
+                        sm.basePos.x + Math.sin(time * 2 + sm.phase) * 0.15,
+                        sm.basePos.y + lift,
+                        sm.basePos.z
+                    );
+                    dummy.rotation.set(0, sm.rotY, 0);
+                    const sc = 0.7 + lift * 0.45;
+                    dummy.scale.set(sc, sc, sc);
+                    dummy.updateMatrix();
+                    smokeInst.setMatrixAt(sm.idx, dummy.matrix);
+                    anyUpdated = true;
+                }
+
+                if (anyUpdated) {
+                    skinInst.instanceMatrix.needsUpdate = true;
+                    torsoInst.instanceMatrix.needsUpdate = true;
+                    legsInst.instanceMatrix.needsUpdate = true;
+                    armInst.instanceMatrix.needsUpdate = true;
+                    smokeInst.instanceMatrix.needsUpdate = true;
+                }
+            }
+        };
+    }
+
+    // ============================================================================
+    // 8. MINI-CARTE HORS ÉCRAN PRÉ-CALCULÉE AU DÉMARRAGE
+    // ============================================================================
+    const minimapCanvas = document.getElementById('minimap');
+    const minimapCtx = minimapCanvas.getContext('2d');
+    const offscreenMap = document.createElement('canvas');
+    offscreenMap.width = minimapCanvas.width;
+    offscreenMap.height = minimapCanvas.height;
+    const mapLookupPoints = [];
+
+    function initMinimap() {
+        const w = offscreenMap.width;
+        const h = offscreenMap.height;
+        const ctx = offscreenMap.getContext('2d');
+
+        ctx.clearRect(0, 0, w, h);
+
+        // Pré-calcul unique des coordonnées 2D du tracé d'Owendo (PK 0) à Franceville (PK 648)
+        const steps = 160;
+        for (let i = 0; i <= steps; i++) {
+            const pk = (i / steps) * TOTAL_KM;
+            const pt = trackCurve.getPointAt(getCurveUFromPK(pk));
+            // Projection sur le canvas
+            const mx = 14 + (pk / TOTAL_KM) * (w - 28);
+            const my = h * 0.52 + (pt.x / 135) * (h * 0.34);
+            mapLookupPoints.push({ pk, x: mx, y: my });
+        }
+
+        // Tracé complet statique en arrière-plan
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.lineWidth = 2.5;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        mapLookupPoints.forEach((p, i) => {
+            if (i === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+        });
+        ctx.stroke();
+
+        // Points des 8 gares (distinction visuelle principales vs secondaire)
+        STATIONS.forEach(st => {
+            const idx = Math.round((st.pk / TOTAL_KM) * steps);
+            const p = mapLookupPoints[idx];
+            ctx.beginPath();
+            if (st.type === 'principale') {
+                ctx.fillStyle = '#f3c623';
+                ctx.arc(p.x, p.y, 4.2, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                ctx.fillStyle = '#111915';
+                ctx.strokeStyle = '#63b3ed';
+                ctx.lineWidth = 2;
+                ctx.arc(p.x, p.y, 3.2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            }
+        });
+    }
+
+    function renderMinimapFrame(currentPK) {
+        const w = minimapCanvas.width;
+        const h = minimapCanvas.height;
+        minimapCtx.clearRect(0, 0, w, h);
+        minimapCtx.drawImage(offscreenMap, 0, 0);
+
+        const maxIdx = Math.min(
+            Math.floor((currentPK / TOTAL_KM) * (mapLookupPoints.length - 1)),
+            mapLookupPoints.length - 1
+        );
+
+        // Segment parcouru
+        if (maxIdx > 0) {
+            minimapCtx.strokeStyle = '#1f8a4c';
+            minimapCtx.lineWidth = 3;
+            minimapCtx.beginPath();
+            for (let i = 0; i <= maxIdx; i++) {
+                const p = mapLookupPoints[i];
+                if (i === 0) minimapCtx.moveTo(p.x, p.y);
+                else minimapCtx.lineTo(p.x, p.y);
+            }
+            minimapCtx.stroke();
+        }
+
+        // Curseur du train
+        const cur = mapLookupPoints[maxIdx];
+        minimapCtx.fillStyle = '#ffffff';
+        minimapCtx.beginPath();
+        minimapCtx.arc(cur.x, cur.y, 4.8, 0, Math.PI * 2);
+        minimapCtx.fill();
+    }
+
+    // ============================================================================
+    // 9. INTERFACE UTILISATEUR, FICHES DE GARE ET CONTRÔLES
+    // ============================================================================
+    const pkDisplay = document.getElementById('pk-display');
+    const biomeDisplay = document.getElementById('biome-display');
+    const stationCard = document.getElementById('station-card');
+    const stTitle = document.getElementById('st-title');
+    const stType = document.getElementById('st-type');
+    const stPk = document.getElementById('st-pk');
+    const stProv = document.getElementById('st-prov');
+    const stPop = document.getElementById('st-pop');
+    const stFact = document.getElementById('st-fact');
+    const stTimer = document.getElementById('st-timer');
+    const endModal = document.getElementById('end-modal');
+
+    function formatValueWithUncertainty(valStr, isSure) {
+        if (isSure) return valStr;
+        return `${valStr}<sup class="uncertain" title="valeur approximative, non vérifiée">~</sup>`;
+    }
+
+    function updateTelemetryUI() {
+        // Source unique de vérité : affichage strictement synchronisé sur state.currentPK
+        const pkRounded = Math.round(state.currentPK);
+        pkDisplay.textContent = `PK ${pkRounded} / ${TOTAL_KM}`;
+        biomeDisplay.textContent = getBiomeName(state.currentPK);
+    }
+
+    function showStationOverlay(stationIdx) {
+        const st = STATIONS[stationIdx];
+        state.activeStationIdx = stationIdx;
+        state.currentPK = st.pk; // Alignement exact du compteur et de la fiche de gare à l'arrêt
+        updateTelemetryUI();
+
+        stationCard.className = `ui-hideable visible ${st.type === 'secondaire' ? 'secondary' : ''}`;
+        stTitle.textContent = st.nom;
+        stType.textContent = st.type === 'principale' ? 'Gare principale' : 'Gare secondaire';
+        stType.className = `st-badge ${st.type}`;
+
+        stPk.innerHTML = formatValueWithUncertainty(`PK ${st.pk}`, st.pkSur);
+        stProv.textContent = st.province;
+        stPop.innerHTML = formatValueWithUncertainty(st.pop.toLocaleString('fr-FR'), st.popSure);
+        stFact.textContent = st.fait;
+
+        state.stationState = 'stopped';
+        state.stopCountdown = 8.0;
+    }
+
+    function departFromStation() {
+        if (state.stationState !== 'stopped') return;
+        stationCard.classList.remove('visible');
+
+        const st = STATIONS[state.activeStationIdx];
+        if (st.type === 'principale') {
+            state.servedPrincipalesCount = Math.min(state.servedPrincipalesCount + 1, 7);
+        }
+
+        if (populationSystem) {
+            populationSystem.triggerDepartureBoarding(state.activeStationIdx);
+        }
+
+        // Si nous sommes au terminus (Franceville, PK 648), afficher l'écran de fin
+        if (state.activeStationIdx === STATIONS.length - 1) {
+            state.currentPK = TOTAL_KM;
+            updateTelemetryUI();
+            state.stationState = 'finished';
+            showEndScreen();
+            return;
+        }
+
+        state.nextStationIdx = state.activeStationIdx + 1;
+        state.stationState = 'cruising';
+    }
+
+    function showEndScreen() {
+        const mins = Math.floor(state.elapsedTravelSec / 60);
+        const secs = Math.floor(state.elapsedTravelSec % 60);
+        document.getElementById('end-dist').textContent = `${TOTAL_KM} km`;
+        document.getElementById('end-stops').textContent = `${state.servedPrincipalesCount} principales`;
+        document.getElementById('end-time').textContent =
+            `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        endModal.classList.add('visible');
+    }
+
+    // Boutons d'interface
+    document.getElementById('btn-depart').addEventListener('click', departFromStation);
+
+    const btnPause = document.getElementById('btn-pause');
+    btnPause.addEventListener('click', () => {
+        state.paused = !state.paused;
+        btnPause.textContent = state.paused ? 'Reprendre' : 'Pause';
+        btnPause.classList.toggle('active', state.paused);
+    });
+
+    document.getElementById('btn-prev').addEventListener('click', () => {
+        endModal.classList.remove('visible');
+        let targetIdx = 0;
+        for (let i = STATIONS.length - 1; i >= 0; i--) {
+            if (STATIONS[i].pk < state.currentPK - 2) {
+                targetIdx = i;
+                break;
+            }
+        }
+        showStationOverlay(targetIdx);
+    });
+
+    [1, 2, 4].forEach(spd => {
+        document.getElementById(`btn-spd-${spd}`).addEventListener('click', (e) => {
+            state.speedMultiplier = spd;
+            [1, 2, 4].forEach(s => document.getElementById(`btn-spd-${s}`).classList.remove('active'));
+            e.currentTarget.classList.add('active');
+        });
+    });
+
+    const btnCam = document.getElementById('btn-cam');
+    function switchCameraMode(mode) {
+        state.cameraMode = mode;
+        if (mode === 'drone') {
+            btnCam.textContent = 'Caméra : Drone';
+            btnCam.classList.add('active');
+            controls.enabled = true;
+            const u = getCurveUFromPK(state.currentPK);
+            const pt = trackCurve.getPointAt(u);
+            const tan = trackCurve.getTangentAt(u);
+            camera.position.copy(pt).addScaledVector(tan, -16).add(new THREE.Vector3(12, 9, 0));
+            controls.target.copy(pt);
+            controls.update();
+        } else {
+            btnCam.textContent = 'Caméra : Cabine';
+            btnCam.classList.remove('active');
+            controls.enabled = false;
+        }
+    }
+
+    btnCam.addEventListener('click', () => {
+        switchCameraMode(state.cameraMode === 'cabine' ? 'drone' : 'cabine');
+    });
+
+    const btnPop = document.getElementById('btn-pop');
+    btnPop.addEventListener('click', () => {
+        state.inhabitantsVisible = !state.inhabitantsVisible;
+        if (populationSystem) populationSystem.setVisible(state.inhabitantsVisible);
+        btnPop.classList.toggle('toggle-on', state.inhabitantsVisible);
+        const count = (state.inhabitantsVisible && populationSystem) ? populationSystem.totalObjects : 0;
+        btnPop.innerHTML = `Habitants : ${state.inhabitantsVisible ? 'ON' : 'OFF'} (<span id="pop-count">${count}</span>)`;
+    });
+
+    function toggleCinemaMode() {
+        document.body.classList.toggle('cinema-mode');
+    }
+    document.getElementById('btn-cinema').addEventListener('click', toggleCinemaMode);
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'c' || e.key === 'C') toggleCinemaMode();
+    });
+
+    document.getElementById('btn-restart').addEventListener('click', () => {
+        endModal.classList.remove('visible');
+        state.elapsedTravelSec = 0;
+        state.servedPrincipalesCount = 0;
+        if (populationSystem) populationSystem.resetBoarders();
+        showStationOverlay(0);
+    });
+
+    document.getElementById('btn-freeview').addEventListener('click', () => {
+        endModal.classList.remove('visible');
+        switchCameraMode('drone');
+    });
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // ============================================================================
+    // 10. POSITIONNEMENT DU TRAIN ET DES CAMÉRAS PAR IMAGE
+    // ============================================================================
+    const prevLocoPos = new THREE.Vector3();
+    const droneForward = new THREE.Vector3(0, 0, -1);
+
+    function updateTrainAndCameras(time, dt, currentVelocityRatio) {
+        const locoU = getCurveUFromPK(state.currentPK);
+        const locoPos = trackCurve.getPointAt(locoU);
+        const locoTan = trackCurve.getTangentAt(locoU);
+
+        // Position de la locomotive et des 4 voitures décalées derrière elle
+        const carSpacingKm = (4.6 / WORLD_LENGTH) * TOTAL_KM;
+        for (let i = 0; i < trainParts.length; i++) {
+            // Pas de bornage à 0 : au PK 0 les voitures se placent sur le prolongement
+            // en amont de la ligne, au lieu de se télescoper sur la locomotive.
+            const carPK = state.currentPK - i * carSpacingKm;
+            const u = getCurveUFromPK(carPK);
+            const pt = trackCurve.getPointAt(u);
+            const tan = trackCurve.getTangentAt(u);
+            trainParts[i].position.copy(pt);
+            trainParts[i].lookAt(pt.clone().add(tan));
+        }
+
+        // La lumière directionnelle et sa cible suivent la locomotive
+        dirLight.position.set(locoPos.x + 38, locoPos.y + 52, locoPos.z + 28);
+        dirLight.target.position.copy(locoPos);
+
+        if (state.cameraMode === 'cabine') {
+            const up = new THREE.Vector3(0, 1, 0);
+            const right = new THREE.Vector3().crossVectors(locoTan, up).normalize();
+
+            // Balancement sinusoïdal qui s'atténue à l'arrêt et respecte prefers-reduced-motion
+            const swayAmp = prefersReducedMotion ? 0 : (0.045 * currentVelocityRatio);
+            const swayX = Math.sin(time * 6.5) * swayAmp;
+            const swayY = Math.abs(Math.cos(time * 13.0)) * swayAmp * 0.6;
+
+            // Caméra placée au-dessus du toit de la cabine (toit jaune à 1.775, nez à 1.425).
+            // À 1.62 elle affleurait le nez, qui mangeait 22 % du bas de l'image : la face
+            // supérieure du nez, large de 1.42 à 0.6 unité devant, couvre alors toute la largeur.
+            const camPos = locoPos.clone()
+                .add(new THREE.Vector3(0, 2.05 + swayY, 0))
+                .addScaledVector(locoTan, 1.25)
+                .addScaledVector(right, swayX);
+
+            camera.position.copy(camPos);
+            const lookTarget = camPos.clone().addScaledVector(locoTan, 18).add(new THREE.Vector3(0, -0.5, 0));
+            camera.lookAt(lookTarget);
+        } else {
+            // Caméra drone : suit le train et s'oriente progressivement dans son axe lors des virages
+            const deltaMove = locoPos.clone().sub(prevLocoPos);
+            camera.position.add(deltaMove);
+            controls.target.lerp(locoPos.clone().add(new THREE.Vector3(0, 1.2, 0)), 0.15);
+
+            droneForward.lerp(locoTan, Math.min(dt * 1.6, 1));
+            controls.update();
+        }
+
+        prevLocoPos.copy(locoPos);
+        return locoPos;
+    }
+
+    // ============================================================================
+    // 11. CHARGEMENT SÉQUENTIEL ET BOUCLE D'ANIMATION
+    // ============================================================================
+    const loaderBar = document.getElementById('loader-bar');
+    const loaderStep = document.getElementById('loader-step');
+    const loaderEl = document.getElementById('loader');
+
+    const loadingSteps = [
+        {
+            label: "Terrain",
+            run: () => { buildTrackCurve(); buildTerrainStep(); }
+        },
+        {
+            label: "Voie ferrée et ponts",
+            run: () => { buildTrackAndBridgesStep(); buildTrainAndBirds(); }
+        },
+        {
+            label: "Forêt équatoriale",
+            run: () => { buildForestStep(); }
+        },
+        {
+            label: "Gares",
+            run: () => { buildStationsStep(); initMinimap(); }
+        },
+        {
+            label: "Habitants et villages",
+            run: () => {
+                // Point d'entrée unique désactivable en une ligne :
+                populationSystem = buildPopulation(scene, stationTransforms);
+                const count = populationSystem ? populationSystem.totalObjects : 0;
+                document.getElementById('pop-count').textContent = count;
+            }
+        }
+    ];
+
+    function runLoadingPipeline(index = 0) {
+        if (index >= loadingSteps.length) {
+            loaderBar.style.width = '100%';
+            setTimeout(() => {
+                loaderEl.classList.add('hidden');
+                // Départ initial depuis Owendo-Virié (PK 0)
+                prevLocoPos.copy(trackCurve.getPointAt(getCurveUFromPK(0)));
+                showStationOverlay(0);
+                // Base de temps remise à zéro ici, sinon la durée du chargement
+                // est comptée dans la première mesure d'images par seconde.
+                lastTime = performance.now();
+                fpsFrames = 0;
+                fpsAccum = 0;
+                requestAnimationFrame(animate);
+            }, 220);
+            return;
+        }
+
+        const step = loadingSteps[index];
+        loaderStep.textContent = step.label + "…";
+        loaderBar.style.width = `${Math.round(((index + 0.2) / loadingSteps.length) * 100)}%`;
+
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                step.run();
+                loaderBar.style.width = `${Math.round(((index + 1) / loadingSteps.length) * 100)}%`;
+                runLoadingPipeline(index + 1);
+            });
+        });
+    }
+
+    let lastTime = performance.now();
+    let fpsFrames = 0;
+    let fpsAccum = 0;
+    const fpsEl = document.getElementById('fps-counter');
+
+    function animate(now) {
+        requestAnimationFrame(animate);
+
+        const rawDt = (now - lastTime) / 1000;
+        lastTime = now;
+        const dt = Math.min(rawDt, 0.05); // Delta de temps borné par image
+        const timeSec = now * 0.001;
+
+        // Compteur FPS
+        fpsFrames++;
+        fpsAccum += rawDt;
+        if (fpsAccum >= 0.5) {
+            // Valeur réelle, sans plafond : la comparaison avec et sans habitants doit rester lisible
+            fpsEl.textContent = Math.round(fpsFrames / fpsAccum);
+            fpsFrames = 0;
+            fpsAccum = 0;
+        }
+
+        let velocityRatio = 0;
+
+        if (!state.paused) {
+            if (state.stationState === 'stopped') {
+                state.stopCountdown -= dt;
+                const secLeft = Math.max(0, Math.ceil(state.stopCountdown));
+                stTimer.textContent = `Départ dans ${secLeft} s`;
+                if (state.stopCountdown <= 0) {
+                    departFromStation();
+                }
+            } else if (state.stationState === 'cruising') {
+                state.elapsedTravelSec += dt;
+                const targetSt = STATIONS[state.nextStationIdx];
+                const distToNext = targetSt.pk - state.currentPK;
+
+                // Décélération progressive à l'approche du quai, compensée dans BASE_SPEED_KMS
+                let approachFactor = 1.0;
+                if (distToNext < APPROACH_KM) {
+                    approachFactor = Math.max(APPROACH_FLOOR, distToNext / APPROACH_KM);
+                }
+
+                velocityRatio = approachFactor;
+                const stepKm = BASE_SPEED_KMS * state.speedMultiplier * approachFactor * dt;
+
+                if (state.currentPK + stepKm >= targetSt.pk) {
+                    showStationOverlay(state.nextStationIdx);
+                    velocityRatio = 0;
+                } else {
+                    state.currentPK += stepKm;
+                    updateTelemetryUI();
+                }
+            }
+        }
+
+        const locoPos = updateTrainAndCameras(timeSec, dt, velocityRatio);
+
+        if (birdsSystem) {
+            birdsSystem.update(locoPos, timeSec, dt);
+        }
+
+        if (populationSystem) {
+            populationSystem.update(
+                locoPos,
+                timeSec,
+                state.activeStationIdx,
+                state.stationState === 'stopped'
+            );
+        }
+
+        renderMinimapFrame(state.currentPK);
+        renderer.render(scene, camera);
+    }
+
+    // Lancement du pipeline asynchrone
+    runLoadingPipeline(0);
+</script>
+</body>
+</html>

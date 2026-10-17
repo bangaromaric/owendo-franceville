@@ -1,0 +1,22 @@
+# Normalisation des fins de ligne : LF dans le depot et a la restitution,
+# quelle que soit la plateforme de l'auteur.
+* text=auto eol=lf
+
+# Fichiers binaires : aucune conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.mp4 binary
+*.webm binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.ico binary
+*.pdf binary
+
+# Exclus des archives generees par GitHub
+.gitattributes export-ignore
+.gitignore     export-ignore
